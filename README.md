@@ -2,6 +2,14 @@
 
 一个用 **SwiftUI + PencilKit** 写的 iOS 绘画工具应用。iOS 原生风格界面，支持 Apple Pencil 压感。
 
+<p align="center">
+  <img src="docs/screenshot-canvas.png" width="300" alt="绘画界面"/>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="docs/screenshot-gallery.png" width="300" alt="画廊界面"/>
+</p>
+
+> 📷 上图为界面示意图（根据真实布局 1:1 还原）。欢迎在真机运行后拍摄实际截图替换。
+
 ## 功能
 
 | 模块 | 说明 |
@@ -103,6 +111,10 @@ SketchPad/
 - 手动画作重命名、标签分类、搜索
 - 压感曲线自定义、导入图片作为底图描摹
 - 导出 PDF / 视频回放笔迹过程
+
+## License
+
+本项目基于 [MIT License](LICENSE) 开源，可自由使用、修改与分发，需保留版权声明。
 
 ## 注意
 
