@@ -1,13 +1,20 @@
 import SwiftUI
 import UIKit
 
-// MARK: - 毛玻璃圆形按钮
+// MARK: - 玻璃圆形按钮
 
 struct FloatingIconButton: View {
     let systemImage: String
     var tint: Color = .primary
     var disabled: Bool = false
+    /// 危险操作（如删除）用带色玻璃强调
+    var destructive: Bool = false
     let action: () -> Void
+
+    private var glassStyle: GlassStyle {
+        if disabled { return .regular }
+        return destructive ? .tinted(.red) : .interactive
+    }
 
     var body: some View {
         Button(action: action) {
@@ -15,7 +22,7 @@ struct FloatingIconButton: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 40, height: 40)
-                .background(.ultraThinMaterial, in: Circle())
+                .adaptiveGlassCircle(glassStyle)
         }
         .buttonStyle(.plain)
         .disabled(disabled)
@@ -95,6 +102,8 @@ struct ColorSheet: View {
                     Button("完成") { dismiss() }
                 }
             }
+            // iOS 26：让面板背景透明，透出后方画布的玻璃质感
+            .adaptiveSheetGlassBackground()
         }
         .presentationDetents([.medium, .large])
         .onAppear {
