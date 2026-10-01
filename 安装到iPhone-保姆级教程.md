@@ -13,18 +13,18 @@
 |---|---|
 | 一台 Mac | macOS 13 Ventura 或更新。MacBook / iMac / Mac mini 都行 |
 | 一根数据线 | iPhone 原装线或 MFi 认证线。**必须是数据线，纯充电线不行** |
-| 你的 iPhone | iOS 16 或更新 |
+| 你的 iPhone | iOS 16.0 以上 |
 | 免费 Apple ID | 就是平时登录 App Store 的那个账号，不用额外注册 |
 | 项目文件 | 就是本教程旁边的 `SketchPad` 整个文件夹 |
 
-### 检查这台 Mac 够不够新
+### 检查这台 macOS 版本
 
 点屏幕左上角  → **关于本机**，看 **macOS 版本**：
 
 - 13 (Ventura) / 14 (Sonoma) / 15 (Sequoia) / 26 → ✅ 可以
 - 12 (Monterey) 或更低 → ⚠️ 需要先升级系统，或改用 [Xcode 14.3.1](https://developer.apple.com/download/all/)（用下面的"调整部署目标"方法）
 
-### 检查 iPhone 系统版本
+### 检查 iOS 版本
 
 iPhone → **设置 → 通用 → 关于本机 → iOS 版本**：
 - 16.0 或更高 → ✅ 直接可用
