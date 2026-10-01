@@ -77,16 +77,6 @@ extension View {
         adaptiveGlass(style, in: Circle())
     }
 
-    /// 系统玻璃按钮样式：iOS 26 用 .glass，旧系统用 .bordered 保底
-    @ViewBuilder
-    func adaptiveGlassButtonStyle(prominent: Bool = false) -> some View {
-        if #available(iOS 26.0, *) {
-            self.buttonStyle(prominent ? .glassProminent : .glass)
-        } else {
-            self.buttonStyle(.bordered)
-        }
-    }
-
     /// sheet 的透明背景：iOS 26 让面板透出后方画布，旧系统保持系统默认背景
     @ViewBuilder
     func adaptiveSheetGlassBackground() -> some View {
