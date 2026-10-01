@@ -167,8 +167,9 @@ final class DrawingStore: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
+            guard let self else { return }
             Task { @MainActor in
-                self?.handleCloudAccountChange()
+                self.handleCloudAccountChange()
             }
         }
         observers.append(token)
@@ -211,9 +212,10 @@ final class DrawingStore: ObservableObject {
             object: query,
             queue: .main
         ) { [weak self] _ in
+            guard let self else { return }
             Task { @MainActor in
-                self?.cloudStatus = .synced(Date())
-                self?.loadGallery()
+                self.cloudStatus = .synced(Date())
+                self.loadGallery()
             }
         }
         observers.append(token)
@@ -223,9 +225,10 @@ final class DrawingStore: ObservableObject {
             object: query,
             queue: .main
         ) { [weak self] _ in
+            guard let self else { return }
             Task { @MainActor in
-                self?.cloudStatus = .synced(Date())
-                self?.loadGallery()
+                self.cloudStatus = .synced(Date())
+                self.loadGallery()
             }
         }
         observers.append(updateToken)
