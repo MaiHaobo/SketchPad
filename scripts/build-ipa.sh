@@ -201,51 +201,50 @@ fi
 echo "  → 最终使用 Bundle ID：$BUNDLE_ID"
 
 # ══════════════════════════════════════════════════════════════
-# 5. 处理 entitlements（iCloud 权限）
+# 5. 处理 entitlements（与描述文件严格一致，避免签名不匹配）
 # ══════════════════════════════════════════════════════════════
-step "5/8 处理 entitlements"
+step "5/8 处理 entitlements（从描述文件提取真实权限）"
 
-PROFILE_HAS_ICLOUD=0
-if /usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.icloud-container-identifiers' \
-     "$PP_PLIST" > /dev/null 2>&1; then
-  PROFILE_HAS_ICLOUD=1
-fi
+# 关键修复：过去这里「猜」 iCloud 容器名，导致与描述文件不匹配而编译失败。
+# 现在直接从描述文件的 Entitlements 取出真实值原样写入，保证 100% 一致。
+# 由签名过程自动注入的键（application-identifier / get-task-allow /
+# keychain-access-groups / team-identifier / beta-reports-active）会被剔除，
+# 因为它们会在签名时由系统按描述文件重新生成，写在 app entitlements 里反而报错。
+DROP_KEYS="application-identifier get-task-allow keychain-access-groups com.apple.developer.team-identifier beta-reports-active"
 
-if [ "$PROFILE_HAS_ICLOUD" = "1" ]; then
-  ok "描述文件支持 iCloud，保留 iCloud 权限"
-  cat > SketchPad/SketchPad.entitlements << ENT
+python3 - "$PP_PLIST" "SketchPad/SketchPad.entitlements" $DROP_KEYS << 'PYEOF_PY'
+import sys, plistlib
+
+src, dst = sys.argv[1], sys.argv[2]
+drop = set(sys.argv[3:])
+
+with open(src, 'rb') as f:
+    pp = plistlib.load(f)
+ent = pp.get('Entitlements', {}) or {}
+kept = {k: v for k, v in ent.items() if k not in drop}
+
+if not kept:
+    kept = {}
+
+with open(dst, 'wb') as f:
+    plistlib.dump(kept, f)
+
+print("  描述文件能力键 :", sorted(ent.keys()) or "(无)")
+print("  写入 app 的键  :", sorted(kept.keys()) or "(空 —— 无需特殊权限)")
+PYEOF_PY
+
+if [ $? -ne 0 ]; then
+  warn "无法解析描述文件权限，退而求其次写空 entitlements"
+  cat > SketchPad/SketchPad.entitlements << 'ENT_EMPTY'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.developer.icloud-container-identifiers</key>
-	<array>
-		<string>iCloud.${BUNDLE_ID}</string>
-	</array>
-	<key>com.apple.developer.icloud-services</key>
-	<array>
-		<string>CloudDocuments</string>
-	</array>
-	<key>com.apple.developer.ubiquity-container-identifiers</key>
-	<array>
-		<string>iCloud.${BUNDLE_ID}</string>
-	</array>
-	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
-	<string>\$(TeamIdentifierPrefix)\$(CFBundleIdentifier)</string>
 </dict>
 </plist>
-ENT
-else
-  warn "描述文件不含 iCloud 权限（个人证书通常如此），本次打包将剥离 iCloud 能力"
-  cat > SketchPad/SketchPad.entitlements << 'ENT'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-</dict>
-</plist>
-ENT
+ENT_EMPTY
 fi
+
 cat SketchPad/SketchPad.entitlements
 
 # ══════════════════════════════════════════════════════════════
