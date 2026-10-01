@@ -36,6 +36,20 @@ open SketchPad.xcodeproj
 
 **环境要求**：Xcode 15+，iOS 16.0+，Swift 5
 
+## 没有 Mac？用 GitHub 云端编译 IPA
+
+项目内置了 GitHub Actions 工作流，可以让 GitHub 的 macOS 机器帮你编译并打包成 `.ipa`：
+
+1. 把代码推到 GitHub 仓库
+2. 在 **Settings → Secrets and variables → Actions** 配置签名证书（4 个 Secret）
+3. 到 **Actions → Build IPA → Run workflow**，等 5-10 分钟
+4. 在运行记录的 **Artifacts** 里下载 `SketchPad-IPA`
+
+> 公开仓库的 macOS runner **免费不限量**，无需自己买 Mac。
+> 也支持推送 `v*` 标签时自动打包并创建 Release。
+
+**完整步骤见 → [IPA安装指南.md](IPA安装指南.md)**（含证书准备、base64 转换、Secrets 配置、装机、报错排查）
+
 ## 开启 iCloud 同步（需手动做一次）
 
 代码和 entitlements 文件已就绪，但 iCloud 能力**必须在 Xcode 里勾选**才能生成正确的签名：
@@ -76,7 +90,11 @@ open SketchPad.xcodeproj
 
 ```
 SketchPad/
+├── .github/workflows/
+│   └── build-ipa.yml             # GitHub Actions 云端编译 IPA
 ├── SketchPad.xcodeproj/          # Xcode 工程（含共享 scheme）
+├── docs/                         # 界面展示图
+├── IPA安装指南.md                # 云端编译 + 装机完整教程
 └── SketchPad/
     ├── SketchPadApp.swift        # App 入口
     ├── Info.plist                # 相册写入权限、横竖屏配置
