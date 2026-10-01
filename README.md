@@ -63,3 +63,7 @@ SketchPad/
 - iCloud 同步（把 `Documents/Artworks` 接入 `NSPersistentCloudKitContainer` 或 `ubiquityContainer`）
 - 压感曲线自定义、导入图片作为底图描摹
 - 导出 PDF / 视频回放笔迹过程
+
+## 注意
+
+该应用使用 CodeBuddy 生成，不一定能正确运行！
