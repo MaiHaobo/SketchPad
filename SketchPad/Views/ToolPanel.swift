@@ -10,46 +10,46 @@ struct ToolPanel: View {
     private let widths: [CGFloat] = [3, 6, 10, 16, 24]
 
     var body: some View {
-        VStack(spacing: 12) {
-            // 工具选择
-            HStack(spacing: 0) {
-                ForEach(InkTool.allCases) { tool in
-                    toolButton(tool)
+        // 容器与动作行的 spacing 保持一致，避免静止时玻璃糊成一片
+        AdaptiveGlassContainer(spacing: 8) {
+            VStack(spacing: 12) {
+                // 工具选择
+                HStack(spacing: 0) {
+                    ForEach(InkTool.allCases) { tool in
+                        toolButton(tool)
+                    }
                 }
+
+                // 动作 + 颜色 + 粗细
+                HStack(spacing: 8) {
+                    FloatingIconButton(
+                        systemImage: "arrow.uturn.backward",
+                        disabled: !store.canUndo
+                    ) {
+                        store.undo()
+                    }
+                    FloatingIconButton(
+                        systemImage: "arrow.uturn.forward",
+                        disabled: !store.canRedo
+                    ) {
+                        store.redo()
+                    }
+                    FloatingIconButton(systemImage: "trash", tint: .red, destructive: true) {
+                        showClearConfirm = true
+                    }
+
+                    Spacer(minLength: 12)
+
+                    colorButton
+                    widthButton
+                }
+                .frame(height: 40)
             }
-
-            // 动作 + 颜色 + 粗细
-            HStack(spacing: 8) {
-                FloatingIconButton(
-                    systemImage: "arrow.uturn.backward",
-                    disabled: !store.canUndo
-                ) {
-                    store.undo()
-                }
-                FloatingIconButton(
-                    systemImage: "arrow.uturn.forward",
-                    disabled: !store.canRedo
-                ) {
-                    store.redo()
-                }
-                FloatingIconButton(systemImage: "trash", tint: .red) {
-                    showClearConfirm = true
-                }
-
-                Spacer(minLength: 12)
-
-                colorButton
-                widthButton
-            }
-            .frame(height: 40)
+            .padding(14)
+            .adaptiveGlass(.regular, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .padding(.horizontal, 10)
+            .padding(.bottom, 6)
         }
-        .padding(14)
-        .background(
-            .regularMaterial,
-            in: RoundedRectangle(cornerRadius: 26, style: .continuous)
-        )
-        .padding(.horizontal, 10)
-        .padding(.bottom, 6)
     }
 
     // MARK: - 工具按钮
