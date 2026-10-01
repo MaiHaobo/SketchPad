@@ -16,7 +16,8 @@ struct CanvasView: UIViewRepresentable {
         canvas.isOpaque = false
         canvas.backgroundColor = store.background.patternColor
         canvas.isScrollEnabled = false            // 单屏画布
-        canvas.isZoomEnabled = false
+        canvas.minimumZoomScale = 1               // iOS 17 已移除 zoomInteractionEnabled，用缩放区间锁定缩放
+        canvas.maximumZoomScale = 1
         canvas.contentInsetAdjustmentBehavior = .never
         canvas.drawing = store.drawing
         canvas.tool = store.currentTool
