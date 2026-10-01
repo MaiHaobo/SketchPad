@@ -88,7 +88,8 @@ security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
 security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" \
   || die "无法创建临时钥匙串"
 security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" \
+  || die "无法解锁临时钥匙串，请检查 Secret KEYCHAIN_PASSWORD"
 
 if ! security import "$CERT_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"; then
   die "证书导入失败。最常见原因：Secret P12_PASSWORD 填错了（它必须是你导出 .p12 时设置的密码）"
@@ -130,6 +131,16 @@ if ! security cms -D -i "$PP_PATH" > "$PP_PLIST" 2>"$TMP/cms.err"; then
   cat "$TMP/cms.err" 2>/dev/null || true
   echo "--- 文件开头 64 字节（用来确认你到底编码了什么）---"
   head -c 64 "$PP_PATH" | od -c | head -4
+  echo "--- 内容类型判断 ---"
+  if openssl pkcs12 -info -in "$PP_PATH" -nokeys -passin pass:"$P12_PASSWORD" > /dev/null 2>&1 \
+     || openssl pkcs12 -info -in "$PP_PATH" -nokeys -passin pass: > /dev/null 2>&1; then
+    echo ">>> 这个文件其实是一个 .p12 证书！说明 BUILD_PROVISION_PROFILE_BASE64 里填成了证书。"
+    echo ">>> 正确做法：这里要填 .mobileprovision（描述文件）的 base64。"
+  elif head -c 300 "$PP_PATH" | tr -d '\0' | grep -qi 'html\|<!doctype\|http'; then
+    echo ">>> 这个文件是网页/文本内容，不是描述文件。"
+  else
+    echo ">>> 无法识别的格式，请确认你编码的是从 Apple 后台 / 商家那里拿到的 .mobileprovision 文件本体。"
+  fi
   die "描述文件无法解析：Secret BUILD_PROVISION_PROFILE_BASE64 里放的不是有效的 .mobileprovision 文件内容"
 fi
 
@@ -160,7 +171,8 @@ if [ -n "$EXP_S" ] && [ "$EXP_S" -lt "$NOW_S" ]; then
 fi
 
 mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PP_UUID.mobileprovision"
+cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PP_UUID.mobileprovision" \
+  || die "无法把描述文件复制到系统目录"
 ok "描述文件已安装到本机"
 
 # ══════════════════════════════════════════════════════════════
