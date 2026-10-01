@@ -33,11 +33,11 @@ enum InkTool: String, CaseIterable, Identifiable {
     func tool(color: UIColor, width: CGFloat) -> PKTool {
         switch self {
         case .pen:
-            return PKInkingTool(.pen, tint: color, width: width)
+            return PKInkingTool(.pen, color: color, width: width)
         case .pencil:
-            return PKInkingTool(.pencil, tint: color, width: width * 1.4)
+            return PKInkingTool(.pencil, color: color, width: width * 1.4)
         case .marker:
-            return PKInkingTool(.marker, tint: color, width: width * 2.4)
+            return PKInkingTool(.marker, color: color, width: width * 2.4)
         case .eraser:
             return PKEraserTool(.bitmap)
         }
