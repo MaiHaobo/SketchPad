@@ -13,7 +13,9 @@
 #  打出来，方便一眼定位问题出在哪个 Secret 上。
 # ─────────────────────────────────────────────────────────────
 
-set -uo pipefail
+# 不用 set -u：脚本已通过 : "${VAR:?}" 显式校验必需输入，
+# set -u 在 macOS runner 上对「延迟赋值」变量会误报 unbound variable，反而挡住正常流程。
+set -o pipefail
 
 step() { printf '\n──── %s ────\n' "$1"; }
 ok()   { printf '[OK] %s\n' "$1"; }
@@ -32,6 +34,7 @@ KEYCHAIN_PATH="$TMP/app-signing.keychain-db"
 XCODE_ARCHIVE="$TMP/SketchPad.xcarchive"
 
 PROJECT_BUNDLE_ID="com.sketchpad.ink"
+BUNDLE_ID=""          # 第 4 步根据描述文件再确定；先初始化避免任何未绑定引用
 SCHEME="SketchPad"
 
 # ══════════════════════════════════════════════════════════════
