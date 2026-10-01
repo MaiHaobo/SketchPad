@@ -395,3 +395,53 @@ IPA=$(find "$BUILD_DIR/export" -name '*.ipa' | head -1)
 
 ls -lh "$IPA"
 ok "打包完成：$IPA"
+
+# ══════════════════════════════════════════════════════════════
+# 9. 发布到 GitHub Release（仅 v* 标签触发时执行）
+#    需要 workflow 传入 GITHUB_TOKEN 并授予 contents: write
+# ══════════════════════════════════════════════════════════════
+if printf '%s' "${GITHUB_REF_NAME:-}" | grep -qE '^v[0-9]'; then
+  TAG="$GITHUB_REF_NAME"
+  step "9/9 发布到 Release $TAG"
+
+  [ -n "${GITHUB_TOKEN:-}" ] || die "GITHUB_TOKEN 为空：请在 workflow 的 env 里加 GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}"
+
+  REPO_API="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+  GH_AUTH="Authorization: Bearer ${GITHUB_TOKEN}"
+
+  # Release 已存在则复用，否则创建
+  RELEASE_ID=$(curl -s -H "$GH_AUTH" "$REPO_API/releases/tags/$TAG" | jq -r '.id // empty' 2>/dev/null || true)
+
+  if [ -z "$RELEASE_ID" ]; then
+    BODY=$(cat <<JSON
+{"tag_name":"$TAG","name":"SketchPad $TAG","body":"## SketchPad $TAG\n\n- 液态玻璃界面（iOS 26+ 呈现原生 Liquid Glass，iOS 16~25 自动回退毛玻璃）\n- 最低支持 **iOS 16.0**\n- 画布 · 画廊 · iCloud 同步\n\n### 安装\n从下方 Assets 下载 \`SketchPad.ipa\`，安装方式见仓库《IPA安装指南》。","draft":false,"prerelease":false}
+JSON
+)
+    RELEASE_JSON=$(curl -s -X POST -H "$GH_AUTH" -H "Content-Type: application/json" -d "$BODY" "$REPO_API/releases")
+    RELEASE_ID=$(printf '%s' "$RELEASE_JSON" | jq -r '.id // empty' 2>/dev/null || true)
+    [ -n "$RELEASE_ID" ] || { printf '%s\n' "$RELEASE_JSON"; die "创建 Release 失败"; }
+    ok "Release 已创建（id=$RELEASE_ID）"
+  else
+    ok "Release 已存在（id=$RELEASE_ID），直接更新资产"
+  fi
+
+  # 同名资产已存在则先删除（重复发布时替换）
+  ASSET_NAME=$(basename "$IPA")
+  ASSET_ID=$(curl -s -H "$GH_AUTH" "$REPO_API/releases/$RELEASE_ID/assets?per_page=100" \
+    | jq -r --arg n "$ASSET_NAME" '.[] | select(.name == $n) | .id' 2>/dev/null || true)
+  if [ -n "$ASSET_ID" ]; then
+    curl -s -X DELETE -H "$GH_AUTH" "$REPO_API/releases/assets/$ASSET_ID" >/dev/null
+    ok "已删除旧资产 $ASSET_NAME"
+  fi
+
+  # 上传 IPA
+  UPLOAD_JSON=$(curl -s -X POST -H "$GH_AUTH" -H "Content-Type: application/octet-stream" \
+    --data-binary @"$IPA" \
+    "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID/assets?name=$ASSET_NAME")
+  ASSET_URL=$(printf '%s' "$UPLOAD_JSON" | jq -r '.browser_download_url // empty' 2>/dev/null || true)
+  [ -n "$ASSET_URL" ] || { printf '%s\n' "$UPLOAD_JSON"; die "上传 IPA 到 Release 失败"; }
+
+  ok "IPA 已发布：$ASSET_URL"
+else
+  echo "非 v* 标签触发，跳过 Release 发布"
+fi
