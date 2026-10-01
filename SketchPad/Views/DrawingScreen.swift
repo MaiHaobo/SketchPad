@@ -33,9 +33,11 @@ struct DrawingScreen: View {
         }
         .sheet(isPresented: $showGallery) {
             GalleryView()
+                .adaptiveSheetGlassBackground()
         }
         .sheet(isPresented: $showColorPicker) {
             ColorSheet()
+                .adaptiveSheetGlassBackground()
         }
         .sheet(isPresented: $showShare) {
             if let shareURL {
@@ -57,14 +59,17 @@ struct DrawingScreen: View {
     // MARK: - 顶部栏
 
     private var topBar: some View {
-        HStack(spacing: 10) {
-            FloatingIconButton(systemImage: "photo.stack") {
-                showGallery = true
+        // 用容器包住左右两个玻璃按钮，共享一次背景采样，避免中间出现接缝
+        AdaptiveGlassContainer(spacing: 10) {
+            HStack(spacing: 10) {
+                FloatingIconButton(systemImage: "photo.stack") {
+                    showGallery = true
+                }
+
+                Spacer()
+
+                overflowMenu
             }
-
-            Spacer()
-
-            overflowMenu
         }
         .padding(.horizontal, 14)
         .padding(.top, 6)
@@ -120,7 +125,7 @@ struct DrawingScreen: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(.primary)
                 .frame(width: 40, height: 40)
-                .background(.ultraThinMaterial, in: Circle())
+                .adaptiveGlassCircle(.interactive)
         }
     }
 
@@ -144,7 +149,7 @@ struct DrawingScreen: View {
                     .font(.subheadline.weight(.medium))
                     .padding(.horizontal, 18)
                     .padding(.vertical, 10)
-                    .background(.regularMaterial, in: Capsule())
+                    .adaptiveGlass(.regular, in: Capsule())
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .padding(.top, 60)
             }
