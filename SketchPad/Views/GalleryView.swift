@@ -83,7 +83,7 @@ struct GalleryView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
-            .background(.bar)
+            .adaptiveGlass(.regular, in: .rect(cornerRadius: 0))
         }
         .buttonStyle(.plain)
         .disabled(!store.cloudStatus.isCloudActive)
