@@ -3,9 +3,9 @@ import SwiftUI
 // MARK: - 液态玻璃双路径封装
 //
 // iOS 26 引入 Liquid Glass 设计语言，SwiftUI 通过 .glassEffect(_:in:) 暴露。
-// 本 App 部署目标是 iOS 17，所以这里把「版本判断」收敛到一处：
+// 本 App 部署目标是 iOS 16，所以这里把「版本判断」收敛到一处：
 //   - iOS 26+  → 原生液态玻璃（折射、高光、可交互形变）
-//   - iOS 17~25 → 回退到原有的 Material 毛玻璃
+//   - iOS 16~25 → 回退到原有的 Material 毛玻璃
 //
 // 使用约定（很重要）：
 //   1. adaptiveGlass 必须写在 .frame()/.padding()/.font() 等「影响外观的修饰符之后」，
@@ -106,5 +106,28 @@ struct AdaptiveGlassContainer<Content: View>: View {
         } else {
             content
         }
+    }
+}
+
+// MARK: - 符号动画降级包装
+
+/// SF Symbol 脉冲动画：symbolEffect 是 iOS 17 才有的 API，
+/// iOS 16 上图标静态显示（其余功能不受影响）。
+struct AdaptiveSymbolPulse: ViewModifier {
+    var isActive: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) {
+            content.symbolEffect(.pulse, isActive: isActive)
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    /// 图标脉冲（同步中等加载场景）；iOS 16 静态显示
+    func adaptiveSymbolPulse(isActive: Bool) -> some View {
+        modifier(AdaptiveSymbolPulse(isActive: isActive))
     }
 }

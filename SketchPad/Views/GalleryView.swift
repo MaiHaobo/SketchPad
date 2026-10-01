@@ -65,7 +65,7 @@ struct GalleryView: View {
             HStack(spacing: 6) {
                 Image(systemName: store.cloudStatus.symbolName)
                     .font(.caption)
-                    .symbolEffect(.pulse, isActive: store.cloudStatus == .syncing)
+                    .adaptiveSymbolPulse(isActive: store.cloudStatus == .syncing)
 
                 Text(store.cloudStatus.isCloudActive
                      ? "iCloud 同步 · \(store.cloudStatus.displayName)"
