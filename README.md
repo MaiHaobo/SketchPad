@@ -66,4 +66,4 @@ SketchPad/
 
 ## 注意
 
-该应用使用 CodeBuddy 生成，不一定能正确运行！
+- 该应用使用 CodeBuddy 生成，不一定能正确运行！
