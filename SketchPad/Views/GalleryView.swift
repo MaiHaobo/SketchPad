@@ -37,6 +37,9 @@ struct GalleryView: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("画廊")
             .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .top) {
+                cloudStatusBar
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("完成") { dismiss() }
@@ -51,6 +54,39 @@ struct GalleryView: View {
                 }
             }
         }
+    }
+
+    // MARK: - iCloud 状态条
+
+    private var cloudStatusBar: some View {
+        Button {
+            store.refreshCloud()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: store.cloudStatus.symbolName)
+                    .font(.caption)
+                    .symbolEffect(.pulse, isActive: store.cloudStatus == .syncing)
+
+                Text(store.cloudStatus.isCloudActive
+                     ? "iCloud 同步 · \(store.cloudStatus.displayName)"
+                     : "iCloud 未开启 · 画作仅保存在本机")
+                    .font(.caption)
+
+                Spacer()
+
+                if store.cloudStatus.isCloudActive {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption2)
+                }
+            }
+            .foregroundStyle(store.cloudStatus.isCloudActive ? Color.accentColor : .secondary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .background(.bar)
+        }
+        .buttonStyle(.plain)
+        .disabled(!store.cloudStatus.isCloudActive)
     }
 
     private var emptyState: some View {

@@ -89,17 +89,167 @@ final class DrawingStore: ObservableObject {
 
     @Published var toast: String?
 
+    // MARK: iCloud
+
+    @Published private(set) var cloudStatus: CloudStatus = .unknown
+
+    /// 存储层：iCloud 优先，不可用时自动降级本地
+    private let storage = ArtworkStorage()
+
+    /// iCloud 目录变更监听
+    private var metadataQuery: NSMetadataQuery?
+    private var observers: [NSObjectProtocol] = []
+
     // MARK: - 路径
 
     private var artworksDir: URL {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let dir = docs.appendingPathComponent("Artworks", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
+        storage.artworksDir
+    }
+
+    deinit {
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        metadataQuery?.disableUpdates()
+        metadataQuery?.stop()
     }
 
     init() {
         loadGallery()
+        setupCloud()
+    }
+
+    // MARK: - iCloud 初始化
+
+    private func setupCloud() {
+        // 先看当前是否有 iCloud 账号（同步调用，很快）
+        let hasAccount = FileManager.default
+            .ubiquityIdentityToken != nil
+
+        guard hasAccount else {
+            cloudStatus = .unavailable
+            return
+        }
+
+        cloudStatus = .available
+
+        // 容器 URL 解析可能耗时，放后台线程
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            let enabled = await Task.detached(priority: .userInitiated) { [storage] in
+                storage.checkCloudAvailability()
+            }.value
+
+            guard enabled else {
+                self.cloudStatus = .unavailable
+                return
+            }
+
+            // 迁移本地存量画作
+            let moved = await Task.detached(priority: .utility) { [storage] in
+                storage.migrateLocalArtworksToCloud()
+            }.value
+
+            self.cloudStatus = .syncing
+            self.loadGallery()
+            if moved > 0 {
+                self.showToast("已将 \(moved) 幅画作移到 iCloud")
+            }
+
+            self.startMetadataQuery()
+            self.observeCloudAccountChanges()
+        }
+    }
+
+    /// 监听 iCloud 账号登录/登出
+    private func observeCloudAccountChanges() {
+        let token = NotificationCenter.default.addObserver(
+            forName: .NSUbiquityIdentityDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleCloudAccountChange()
+            }
+        }
+        observers.append(token)
+    }
+
+    private func handleCloudAccountChange() {
+        let storage = self.storage
+        Task { @MainActor in
+            let enabled = await Task.detached(priority: .userInitiated) {
+                storage.checkCloudAvailability()
+            }.value
+
+            if enabled {
+                self.cloudStatus = .syncing
+                self.loadGallery()
+                self.startMetadataQuery()
+            } else {
+                self.cloudStatus = .unavailable
+                self.loadGallery()
+                self.stopMetadataQuery()
+            }
+        }
+    }
+
+    // MARK: - iCloud 变更监听
+
+    /// 监听 iCloud 目录变化（其他设备新增/删除画作时自动刷新画廊）
+    private func startMetadataQuery() {
+        guard storage.isUsingCloud, metadataQuery == nil else { return }
+
+        let query = NSMetadataQuery()
+        query.searchScopes = [NSMetadataQueryUbiquitousDocumentsScope]
+        query.predicate = NSPredicate(
+            format: "%K LIKE '*.drawing'",
+            NSMetadataItemFSNameKey
+        )
+
+        let token = NotificationCenter.default.addObserver(
+            forName: .NSMetadataQueryDidFinishGathering,
+            object: query,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.cloudStatus = .synced(Date())
+                self?.loadGallery()
+            }
+        }
+        observers.append(token)
+
+        let updateToken = NotificationCenter.default.addObserver(
+            forName: .NSMetadataQueryDidUpdate,
+            object: query,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.cloudStatus = .synced(Date())
+                self?.loadGallery()
+            }
+        }
+        observers.append(updateToken)
+
+        metadataQuery = query
+        query.start()
+    }
+
+    private func stopMetadataQuery() {
+        metadataQuery?.disableUpdates()
+        metadataQuery?.stop()
+        metadataQuery = nil
+    }
+
+    /// 手动触发一次同步刷新
+    func refreshCloud() {
+        guard cloudStatus.isCloudActive else {
+            showToast("iCloud 不可用，当前仅保存在本机")
+            return
+        }
+        cloudStatus = .syncing
+        loadGallery()
+        cloudStatus = .synced(Date())
+        showToast("已刷新")
     }
 
     // MARK: - 工具应用
@@ -200,12 +350,11 @@ final class DrawingStore: ObservableObject {
         let id = editingArtworkID ?? UUID()
         let isNew = editingArtworkID == nil
         do {
-            let drawingURL = artworksDir.appendingPathComponent("\(id.uuidString).drawing")
-            try drawing.dataRepresentation().write(to: drawingURL)
+            let drawingURL = storage.drawingURL(for: id)
+            try storage.write(drawing.dataRepresentation(), to: drawingURL)
 
-            let thumbURL = artworksDir.appendingPathComponent("\(id.uuidString).png")
             if let image = renderImage(scale: 1) {
-                try? image.pngData()?.write(to: thumbURL)
+                try? storage.write(image.pngData() ?? Data(), to: storage.thumbnailURL(for: id))
             }
 
             if isNew {
@@ -214,53 +363,83 @@ final class DrawingStore: ObservableObject {
             } else if let index = gallery.firstIndex(where: { $0.id == id }) {
                 gallery[index].savedAt = Date()
             }
-            showToast(isNew ? "已保存到画廊" : "画作已更新")
+
+            if storage.isUsingCloud {
+                cloudStatus = .synced(Date())
+                showToast(isNew ? "已保存并同步到 iCloud" : "已更新并同步")
+            } else {
+                showToast(isNew ? "已保存到画廊" : "画作已更新")
+            }
         } catch {
             showToast("保存失败，请重试")
         }
     }
 
     func loadGallery() {
-        let fm = FileManager.default
-        guard let files = try? fm.contentsOfDirectory(
-            at: artworksDir,
-            includingPropertiesForKeys: [.contentModificationDateKey]
-        ) else { return }
-
-        var items: [Artwork] = []
-        for url in files where url.pathExtension == "drawing" {
-            let name = url.deletingPathExtension().lastPathComponent
-            guard let id = UUID(uuidString: name) else { continue }
-            let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
-                .contentModificationDate ?? Date()
-            items.append(Artwork(id: id, savedAt: date))
-        }
-        gallery = items.sorted { $0.savedAt > $1.savedAt }
+        gallery = storage.listDrawings()
+            .map { Artwork(id: $0.id, savedAt: $0.savedAt) }
+            .sorted { $0.savedAt > $1.savedAt }
     }
 
     func openArtwork(_ artwork: Artwork) {
-        let url = artworksDir.appendingPathComponent("\(artwork.id.uuidString).drawing")
-        guard let data = try? Data(contentsOf: url),
-              let saved = try? PKDrawing(data: data) else {
-            showToast("无法打开画作")
-            return
+        let url = storage.drawingURL(for: artwork.id)
+
+        Task { @MainActor in
+            // iCloud 文件可能还没下载到本地，先确保就绪
+            let ready = await storage.ensureDownloaded(url)
+
+            guard ready, let data = storage.read(at: url),
+                  let saved = try? PKDrawing(data: data) else {
+                showToast(storage.isUsingCloud ? "画作下载失败，请检查网络" : "无法打开画作")
+                return
+            }
+            load(saved, artworkID: artwork.id)
         }
-        load(saved, artworkID: artwork.id)
     }
 
     func deleteArtwork(_ artwork: Artwork) {
-        let fm = FileManager.default
-        try? fm.removeItem(at: artworksDir.appendingPathComponent("\(artwork.id.uuidString).drawing"))
-        try? fm.removeItem(at: artworksDir.appendingPathComponent("\(artwork.id.uuidString).png"))
+        storage.remove(storage.drawingURL(for: artwork.id))
+        storage.remove(storage.thumbnailURL(for: artwork.id))
         gallery.removeAll { $0.id == artwork.id }
         if editingArtworkID == artwork.id {
             editingArtworkID = nil
         }
+        if storage.isUsingCloud {
+            cloudStatus = .synced(Date())
+        }
     }
 
     func thumbnail(for artwork: Artwork) -> UIImage? {
-        let url = artworksDir.appendingPathComponent("\(artwork.id.uuidString).png")
-        return UIImage(contentsOfFile: url.path)
+        let url = storage.thumbnailURL(for: artwork.id)
+
+        // iCloud 缩略图未下载时，尝试从已下载的 drawing 现场渲染一张
+        if let image = UIImage(contentsOfFile: url.path) {
+            return image
+        }
+
+        guard storage.isUsingCloud,
+              let data = storage.read(at: storage.drawingURL(for: artwork.id)),
+              let drawing = try? PKDrawing(data: data) else {
+            return nil
+        }
+
+        let scale: CGFloat = 1
+        guard let image = Self.renderThumbnail(from: drawing, scale: scale) else { return nil }
+        return image
+    }
+
+    /// 从 PKDrawing 渲染缩略图（背景 + 笔画）
+    static func renderThumbnail(from drawing: PKDrawing, scale: CGFloat) -> UIImage? {
+        let bounds = drawing.bounds
+        guard !bounds.isEmpty, bounds.width > 0, bounds.height > 0 else { return nil }
+
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        return UIGraphicsImageRenderer(size: bounds.size, format: format).image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(origin: .zero, size: bounds.size))
+            drawing.image(from: bounds, scale: scale).draw(in: CGRect(origin: .zero, size: bounds.size))
+        }
     }
 
     // MARK: - Toast

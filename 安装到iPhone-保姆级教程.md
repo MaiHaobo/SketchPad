@@ -279,7 +279,56 @@ com.你的名字拼音.sketchpad
 
 ---
 
-## 附录 B：项目文件怎么打包发给别人
+## 附录 B：开启 iCloud 同步（可选）
+
+画作默认存在手机本地。想让 iPhone 和 iPad 之间自动同步画作，需要开启 iCloud：
+
+### B.1 添加 iCloud Capability
+
+1. Xcode 里点左侧最上面的蓝色 **SketchPad** 项目图标
+2. 选 **Signing & Capabilities** 标签
+3. 左上角点 **+ Capability**（在 Team 那一行的左边）
+4. 弹出搜索框，输入 `icloud`，双击 **iCloud**
+5. 页面下方会出现 **iCloud** 区块，勾选：
+   - ☑️ **Cloud Documents**
+   - Container 列表里应该能看到 `iCloud.com.sketchpad.ink`
+     （如果只有 `Use default container` 或空的，点下面 **+** 号新建，名称必须是 `iCloud.com.sketchpad.ink`）
+
+> ⚠️ **名称必须一字不差**。代码里写死了这个标识符，改了名会导致同步不工作。
+> 如果你想用别的名字，需要同步修改 `SketchPad/Models/ArtworkStorage.swift` 里的
+> `containerIdentifier` 常量。
+
+### B.2 重新运行
+
+按 **⌘R** 重新安装。
+
+### B.3 验证是否生效
+
+打开 App → 点左上角的画廊图标 → 看**顶部状态条**：
+
+| 显示 | 含义 |
+|---|---|
+| 🔵 `iCloud 同步 · 已同步` | ✅ 成功了 |
+| ⚪️ `iCloud 未开启 · 画作仅保存在本机` | ❌ 没生效，检查下面 |
+
+**没生效的排查顺序：**
+
+1. 手机上 **设置 → 你的名字 → iCloud** 是否已登录？（没登录就登一下）
+2. 手机的 **设置 → 你的名字 → iCloud → iCloud Drive** 是否开着？
+3. Xcode 里 iCloud 区块的 Container 名字对不对？
+4. 点一下状态条可以手动刷新
+
+### B.4 注意事项
+
+- **首次同步要等一会**：已有画作需要上传，有几秒到几十秒延迟
+- **模拟器测试要先登录 iCloud**：模拟器 → 设置 → 登录 iPhone → 输入 Apple ID，
+  否则会走本地降级模式
+- **免费 Apple ID 也支持 iCloud**：只要在 Xcode 里选了 Personal Team，iCloud 功能可以用
+- **数据不会丢**：iCloud 同步失败时 App 自动降级为本地保存，画作依然安全
+
+---
+
+## 附录 C：项目文件怎么打包发给别人
 
 在访达里：
 
@@ -304,6 +353,8 @@ com.你的名字拼音.sketchpad
 | 找不到"开发者模式" | 未激活 | 先按 ⌘R 跑一次，失败后再看设置 |
 | 手机连上没反应 | 线是充电线 / 没点信任 | 换线，重新点"信任" |
 | 提示磁盘空间不足 | Xcode 太占地方 | 需要至少 40 GB 空闲空间 |
+| 画廊顶部显示"仅保存在本机" | iCloud 没开启 | 做附录 B |
+| 报错 `No such a provisioning profile` 且提到了 iCloud | Container 名字不对 | 检查附录 B.1 第 5 步 |
 
 ---
 
@@ -313,4 +364,5 @@ com.你的名字拼音.sketchpad
 拷文件夹到桌面 → 装 Xcode 并启动一次 → 打开 .xcodeproj
 → Signing 里登录 Apple ID 选 Personal Team（报错就改 Bundle ID）
 → 手机连线信任 → 开开发者模式 → ⌘R → 手机上信任证书 → 完成
+→（可选）加 iCloud Capability 开启多设备同步
 ```
