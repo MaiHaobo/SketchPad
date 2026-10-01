@@ -275,7 +275,7 @@ com.你的名字拼音.sketchpad
 6. 按 ⌘R 重试
 
 > ⚠️ 本项目用了 iOS 16 的 API（`.presentationDetents`、`NavigationStack`、`GridItem` 等），
-> 降到 15.0 后如果报错，把错误消息发我，我来改代码适配。
+> 降到 15.0 后如果报错，把错误消息发我邮箱 3602246802@qq.com，我来改代码适配。
 
 ---
 
