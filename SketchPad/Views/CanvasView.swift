@@ -16,7 +16,7 @@ struct CanvasView: UIViewRepresentable {
         canvas.isOpaque = false
         canvas.backgroundColor = store.background.patternColor
         canvas.isScrollEnabled = false            // 单屏画布
-        canvas.zoomInteractionEnabled = false
+        canvas.isZoomEnabled = false
         canvas.contentInsetAdjustmentBehavior = .never
         canvas.drawing = store.drawing
         canvas.tool = store.currentTool
