@@ -201,27 +201,32 @@ fi
 echo "  → 最终使用 Bundle ID：$BUNDLE_ID"
 
 # ══════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════
 # 5. 处理 entitlements（与描述文件严格一致，避免签名不匹配）
 # ══════════════════════════════════════════════════════════════
-step "5/8 处理 entitlements（从描述文件提取真实权限）"
+step "5/8 处理 entitlements（从描述文件提取真实 iCloud 权限）"
 
-# 关键修复：过去这里「猜」 iCloud 容器名，导致与描述文件不匹配而编译失败。
-# 现在直接从描述文件的 Entitlements 取出真实值原样写入，保证 100% 一致。
-# 由签名过程自动注入的键（application-identifier / get-task-allow /
-# keychain-access-groups / team-identifier / beta-reports-active）会被剔除，
-# 因为它们会在签名时由系统按描述文件重新生成，写在 app entitlements 里反而报错。
-DROP_KEYS="application-identifier get-task-allow keychain-access-groups com.apple.developer.team-identifier beta-reports-active"
-
-python3 - "$PP_PLIST" "SketchPad/SketchPad.entitlements" $DROP_KEYS << 'PYEOF_PY'
+# 关键修复：
+# 1) 过去「猜」 iCloud 容器名 -> 与描述文件不匹配；现在改为从描述文件取真实值。
+# 2) 证书商给的描述文件往往塞了一堆用不到的权限（ClassKit / Sign in with Apple /
+#    各种 media 权限），其中有的取值类型还不对（如 ClassKit-environment 是数组
+#    而非 NSString），直接整段拷进 app 的 entitlements 会让 xcodebuild 报
+#    "Malformed value type"。
+# 正确做法：app 只声明它真正用到的能力 —— 即 iCloud 家族
+# （com.apple.developer.icloud-* / com.apple.developer.ubiquity-*），
+# 其余权限由描述文件在签名阶段自动提供，无需也不能写进 app entitlements。
+python3 - "$PP_PLIST" "SketchPad/SketchPad.entitlements" << 'PYEOF_PY'
 import sys, plistlib
 
 src, dst = sys.argv[1], sys.argv[2]
-drop = set(sys.argv[3:])
 
 with open(src, 'rb') as f:
     pp = plistlib.load(f)
 ent = pp.get('Entitlements', {}) or {}
-kept = {k: v for k, v in ent.items() if k not in drop}
+
+# 只保留 iCloud 家族（app 实际用到的能力）
+keep_prefixes = ('com.apple.developer.icloud', 'com.apple.developer.ubiquity')
+kept = {k: v for k, v in ent.items() if k.startswith(keep_prefixes)}
 
 if not kept:
     kept = {}
@@ -229,8 +234,8 @@ if not kept:
 with open(dst, 'wb') as f:
     plistlib.dump(kept, f)
 
-print("  描述文件能力键 :", sorted(ent.keys()) or "(无)")
-print("  写入 app 的键  :", sorted(kept.keys()) or "(空 —— 无需特殊权限)")
+print("  描述文件全部能力键 :", sorted(ent.keys()) or "(无)")
+print("  写入 app 的 iCloud 键 :", sorted(kept.keys()) or "(无 —— 将剥离 iCloud)")
 PYEOF_PY
 
 if [ $? -ne 0 ]; then
