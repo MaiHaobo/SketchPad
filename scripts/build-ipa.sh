@@ -42,18 +42,28 @@ SCHEME="SketchPad"
 # ══════════════════════════════════════════════════════════════
 step "0/8 选择 Xcode"
 
+# glob 不匹配时返回空字符串而非报错，避免 runner 上目录名有差异时脚本直接挂掉
+shopt -s nullglob
+
 # 目标：优先选可用的最高版本 Xcode（需要 ≥26 才能编译液态玻璃 API）。
-# 注意 macos-26 上目录名形如 /Applications/Xcode_26.5.app，并非固定的 Xcode_26.x.app。
+#   - xcode-27 镜像里是 /Applications/Xcode_27_beta_3.app（带 beta），所以不能一味排除 beta
+#   - macos-26 镜像里是 /Applications/Xcode_26.5.app
+# 策略：先挑「正式版」里版本最高的；若一个正式版都没有，才放宽允许 beta/RC。
 pick_xcode() {
-  local candidates=()
-  for app in /Applications/Xcode_2[6-9]*.app /Applications/Xcode.app; do
+  local stable=() any=()
+  for app in /Applications/Xcode_2[6-9]*.app /Applications/Xcode_2[6-9].app; do
     [ -d "$app" ] || continue
+    any+=("$app")
     case "$(basename "$app")" in
-      *beta*|*Beta*|*RC*|*rc*) continue ;;   # 排除测试版
+      *beta*|*Beta*|*RC*|*rc*) ;;          # 测试版：只进 any
+      *) stable+=("$app") ;;               # 正式版：优先
     esac
-    candidates+=("$app")
   done
-  printf '%s\n' "${candidates[@]}" | sort -rV | head -1
+  if [ ${#stable[@]} -gt 0 ]; then
+    printf '%s\n' "${stable[@]}" | sort -rV | head -1
+  elif [ ${#any[@]} -gt 0 ]; then
+    printf '%s\n' "${any[@]}" | sort -rV | head -1
+  fi
 }
 
 XCODE_APP="$(pick_xcode)"
@@ -71,7 +81,7 @@ echo "  iPhoneOS SDK 版本：${SDK_VER:-未知}"
 case "$SDK_VER" in
   2[6-9].*|3[0-9].*) ok "SDK 满足 iOS 26+ 编译要求" ;;
   "")                warn "读不到 SDK 版本，继续尝试" ;;
-  *)                 die "当前 Xcode 的 iPhoneOS SDK 是 $SDK_VER（<26），无法编译液态玻璃 API。请把 workflow 的 runs-on 改为 macos-26" ;;
+  *)                 die "当前 Xcode 的 iPhoneOS SDK 是 $SDK_VER（<26），无法编译液态玻璃 API。请把 workflow 的 runs-on 改为 macos-26 或 xcode-27" ;;
 esac
 
 # ══════════════════════════════════════════════════════════════
