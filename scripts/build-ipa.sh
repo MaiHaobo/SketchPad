@@ -41,9 +41,38 @@ SCHEME="SketchPad"
 # 0. 环境
 # ══════════════════════════════════════════════════════════════
 step "0/8 选择 Xcode"
-sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer 2>/dev/null \
-  || sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+# 目标：优先选可用的最高版本 Xcode（需要 ≥26 才能编译液态玻璃 API）。
+# 注意 macos-26 上目录名形如 /Applications/Xcode_26.5.app，并非固定的 Xcode_26.x.app。
+pick_xcode() {
+  local candidates=()
+  for app in /Applications/Xcode_2[6-9]*.app /Applications/Xcode.app; do
+    [ -d "$app" ] || continue
+    case "$(basename "$app")" in
+      *beta*|*Beta*|*RC*|*rc*) continue ;;   # 排除测试版
+    esac
+    candidates+=("$app")
+  done
+  printf '%s\n' "${candidates[@]}" | sort -rV | head -1
+}
+
+XCODE_APP="$(pick_xcode)"
+if [ -z "$XCODE_APP" ] || [ ! -d "$XCODE_APP" ]; then
+  warn "没找到 Xcode 26+，回退到 /Applications/Xcode.app"
+  XCODE_APP="/Applications/Xcode.app"
+fi
+echo "  选中 Xcode：$XCODE_APP"
+sudo xcode-select -s "$XCODE_APP/Contents/Developer" || die "xcode-select 到 $XCODE_APP 失败（路径不存在或权限不足）"
 xcodebuild -version || die "找不到 xcodebuild"
+
+# 硬性门槛：SDK 必须 ≥26，否则液态玻璃代码编不过
+SDK_VER=$(xcodebuild -version -sdk iphoneos ProductVersion 2>/dev/null | head -1 || true)
+echo "  iPhoneOS SDK 版本：${SDK_VER:-未知}"
+case "$SDK_VER" in
+  2[6-9].*|3[0-9].*) ok "SDK 满足 iOS 26+ 编译要求" ;;
+  "")                warn "读不到 SDK 版本，继续尝试" ;;
+  *)                 die "当前 Xcode 的 iPhoneOS SDK 是 $SDK_VER（<26），无法编译液态玻璃 API。请把 workflow 的 runs-on 改为 macos-26" ;;
+esac
 
 # ══════════════════════════════════════════════════════════════
 # 1. 解码 Secrets
