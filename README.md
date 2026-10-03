@@ -4,6 +4,7 @@
 
 <p align="center">
   <img src="docs/screenshot-canvas.png" width="49%" alt="绘画界面"/
+  <img src="docs/screenshot-canvas.png" width="49%" alt="画廊界面"/
 
 ## 功能
 
