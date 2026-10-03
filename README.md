@@ -5,7 +5,7 @@
 <p align="center">
   <img src="docs/screenshot-canvas.png" width="49%" alt="绘画界面"/
   <img src="docs/screenshot-gallery.png" width="49%" alt="画廊界面"/
-
+</p>
 ## 功能
 
 | 模块 | 说明 |
