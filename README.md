@@ -3,8 +3,8 @@
 一个用 **SwiftUI + PencilKit** 写的 iOS 绘画工具应用。iOS 原生风格界面，支持 Apple Pencil 压感。
 
 <p align="center">
-  <img src="docs/screenshot-canvas.png" width="49%" alt="绘画界面"/
-  <img src="docs/screenshot-gallery.png" width="49%" alt="画廊界面"/
+  <img src="docs/screenshot-canvas.png" width="49%" alt="绘画界面"/>
+  <img src="docs/screenshot-gallery.png" width="49%" alt="画廊界面"/>
 </p>
 
 ## 功能
